@@ -1,0 +1,77 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres
+    restart: always
+    volumes:
+    - ./data/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=db_admin
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=1111
+    expose:
+      - "5432"
+    ports:
+      - 5454:5432
+    networks:
+      chat-networks:
+        ipv4_address: 172.20.0.2
+
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/.Dockerfile
+    restart: always
+    command: ["./docker/django-run.sh"]
+    volumes:
+      - .:/code
+    environment:
+       - SECRET_KEY="django-insecure-g9roqg^de!=!71&%ck&qaqm8mwvl@d5w19#!d5t^=@_kvmg$de"
+       - DEBUG=True
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
+    networks:
+      chat-networks:
+        ipv4_address: 172.20.0.5
+
+
+  redis:
+    image: redis:alpine
+    restart: always
+    ports:
+    - "6479:6479"
+    networks:
+      chat-networks:
+        ipv4_address: 172.20.0.4
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/.Dockerfile
+    restart: always
+    command: celery -A Test_task_chat worker -l info -P gevent
+    volumes:
+      - ./:/app/
+    environment:
+      - SECRET_KEY="django-insecure-g9roqg^de!=!71&%ck&qaqm8mwvl@d5w19#!d5t^=@_kvmg$de"
+      - DEBUG=True
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    networks:
+      chat-networks:
+        ipv4_address: 172.20.0.3
+
+
+networks:
+  chat-networks:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+

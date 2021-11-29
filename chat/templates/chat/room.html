@@ -1,0 +1,105 @@
+<!-- chat/templates/chat/room.html -->
+{% extends 'base.html' %}
+{% block content %}
+    <div id="page"></div>
+    <textarea id="chat-log" cols="100" rows="20" readonly>
+    </textarea><br>
+    <input id="chat-message-input" type="text" size="100"><br>
+    <input id="chat-message-submit" type="button" value="Send">
+    <input id="chat-message-submit_postpone" type="button" value="Postpone_message">
+    <input id="chat-message-anonymous" type="checkbox">
+    <label for="chat-message-anonymous">Send message as anonymous</label>
+    <div id="postpone_date" hidden>
+        <input id="date_post" type="datetime-local">Your message will be sent on set date</div>
+    {{ room_name|json_script:"room-name"}}
+    <script>
+        const roomName = JSON.parse(document.getElementById('room-name').textContent);
+        async function getMessages(url) {
+            const response = await fetch(url);
+            return await response.json();}
+
+
+        document.querySelector('#chat-message-submit_postpone').onclick = function (e) {
+            const hide_div = document.querySelector('#postpone_date')
+            hide_div.hidden = !hide_div.hidden
+            const date = document.querySelector('#date_post')
+            date.value = ''
+        }
+
+        function fill_chat(page='') {
+            getMessages('http://'+window.location.host+'/api/messageschat/'+roomName+page).then(value => {
+                const page = document.getElementById('page');
+                for (var i in value.elided_page) {
+                    const button_page = document.createElement('button')
+                    if ((value.elided_page[i]===value.page_number) || (typeof value.elided_page[i]==='string')) {
+                        button_page.disabled=true};
+                    button_page.innerHTML=value.elided_page[i];
+                    button_page.id='but_page';
+                    button_page.name=value.elided_page[i];
+                    button_page.onclick=page_click;
+                    page.appendChild(button_page);
+                };
+
+            for (let message of value.results.reverse()) {
+                document.querySelector('#chat-log').value+=(message.user + ': '
+                    + message.date_posted + '>> ' + message.text + '\n')
+            };
+         });
+        }
+    </script>
+    <script>
+        const chatSocket = new WebSocket(
+            'ws://'
+            + window.location.host
+            + '/ws/chat/'
+            + roomName
+            + '/'
+        );
+
+        function page_click(e) {
+            const page = e.target.attributes.name.nodeValue
+            document.querySelector('#chat-log').value=''
+            document.querySelector('#page').innerHTML=''
+            fill_chat('?page='+page)
+        }
+
+        chatSocket.onopen = function (e) {
+            fill_chat()
+         }
+
+        chatSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            document.querySelector('#chat-log').value += (data.user + ': '+
+                data.date + '>> ' + data.message + '\n');
+        };
+
+         chatSocket.onclose = function(e) {
+             alert('Chat socket closed unexpectedly.Please restart page')
+            console.error('Chat socket closed unexpectedly');
+        };
+
+
+        document.querySelector('#chat-message-input').focus();
+        document.querySelector('#chat-message-input').onkeyup = function(e) {
+            if (e.keyCode === 13) {  // enter, return
+                document.querySelector('#chat-message-submit').click();
+            }
+        };
+
+        document.querySelector('#chat-message-submit').onclick = function(e) {
+            const messageInputDom = document.querySelector('#chat-message-input');
+            const message = messageInputDom.value;
+            const date_post = document.querySelector('#date_post');
+            const anonymous = document.querySelector('#chat-message-anonymous');
+            chatSocket.send(JSON.stringify({
+                'message': message,
+                'date_postpone': date_post.value.toString(),
+                'anonymous': anonymous.checked
+            }));
+            messageInputDom.value = '';
+            document.querySelector('#postpone_date').hidden;
+            date_post.value='';
+            anonymous.checked = false
+        };
+    </script>
+{% endblock %}

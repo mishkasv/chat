@@ -1,0 +1,56 @@
+<!-- chat/templates/chat/index.html -->
+{% extends 'base.html' %}
+{% block content %}
+    <div>
+    Your chat list:
+    {% if user.groups_of_chats.all %}
+        {% for chat in user.groups_of_chats.all %}
+            <br><a href="/chat/{{ chat.name }}">{{ chat.name }}</a>
+        {% endfor %}
+    {% else %}
+        <br><span>no chats</span>
+    {% endif %}
+    </div>
+    <br>
+    What chat room would you like to enter or create?<br>
+    <input id="room-name-input" type="text" size="100"><br>
+    <input id="room-name-submit1" type="button" value="Create">
+    <input id="room-name-submit2" type="button" value="Add and open new chat">
+    {% csrf_token %}
+    <script>
+        async function create_room(url, data, method) {
+          const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+          const response = await fetch(url, {
+            method: method,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify(data)
+          });
+          console.log(response)
+          return await response.json();
+        };
+
+
+        document.querySelector('#room-name-input').focus();
+        document.querySelector('#room-name-input').onkeyup = function(e) {
+            if (e.keyCode === 13) {  // enter, return
+                document.querySelector('#room-name-submit1').click();
+            }
+        };
+
+        document.querySelector('#room-name-submit1').onclick = function(e) {
+            var roomName = document.querySelector('#room-name-input').value;
+            create_room('http://'+window.location.host +"/api/groups/", {"name" : roomName, "users":[{{user.id}},] }, 'POST');
+            window.location.pathname = '/chat/' + roomName + '/';
+        };
+
+        document.querySelector('#room-name-submit2').onclick = function(e) {
+            var roomName = document.querySelector('#room-name-input').value;
+            create_room('http://'+window.location.host+"/api/update_groups/"+roomName, '',"POST");
+            window.location.pathname = '/chat/' + roomName + '/';
+        };
+    </script>
+
+{% endblock %}
