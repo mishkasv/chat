@@ -140,4 +140,5 @@ cython_debug/
 .try.py
 .db.sqlite3
 data/
+.idea/
 
